@@ -130,6 +130,12 @@ config MACH_T5325
 	  Say 'Y' here if you want your kernel to support the
 	  HP t5325 Thin Client.
 
+config MACH_NEDAP_AX8008
+	bool "Nedap AX8008 Board"
+	help
+	  Say 'Y' here if you want your kernel to support the
+	  Nedap AX8008 Board.
+
 endmenu
 
 endif
