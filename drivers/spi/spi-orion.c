@@ -18,11 +18,12 @@
 #include <linux/spi/spi.h>
 #include <linux/spi/orion_spi.h>
 #include <linux/module.h>
+#include <linux/gpio.h>
 #include <asm/unaligned.h>
 
 #define DRIVER_NAME			"orion_spi"
 
-#define ORION_NUM_CHIPSELECTS		1 /* only one slave is supported*/
+#define ORION_NUM_CHIPSELECTS		2 /* only one slave is supported*/
 #define ORION_SPI_WAIT_RDY_MAX_LOOP	2000 /* in usec */
 
 #define ORION_SPI_IF_CTRL_REG		0x00
@@ -156,8 +157,28 @@ orion_spi_setup_transfer(struct spi_device *spi, struct spi_transfer *t)
 	return orion_spi_set_transfer_size(orion_spi, bits_per_word);
 }
 
-static void orion_spi_set_cs(struct orion_spi *orion_spi, int enable)
+static void orion_spi_set_cs(struct orion_spi *orion_spi, int chip_select, int enable)
 {
+#define CS0			0 // MPP0
+#define CS1			7 // MPP7
+	if (chip_select) {
+		// chip select 1
+		gpio_direction_output(CS0, 1); // disable CS0
+
+		if (enable)
+			gpio_direction_output(CS1, 0);
+		else
+			gpio_direction_output(CS1, 1);
+	}
+	else {
+		// chip select 0
+		gpio_direction_output(CS1, 1); // disable CS1
+
+		if (enable)
+			gpio_direction_output(CS0, 0);
+		else
+			gpio_direction_output(CS0, 1);
+	}
 	if (enable)
 		orion_spi_setbits(orion_spi, ORION_SPI_IF_CTRL_REG, 0x1);
 	else
@@ -315,7 +336,7 @@ static void orion_spi_work(struct work_struct *work)
 			}
 
 			if (!cs_active) {
-				orion_spi_set_cs(orion_spi, 1);
+				orion_spi_set_cs(orion_spi, spi->chip_select, 1);
 				cs_active = 1;
 			}
 
@@ -327,14 +348,14 @@ static void orion_spi_work(struct work_struct *work)
 				udelay(t->delay_usecs);
 
 			if (t->cs_change) {
-				orion_spi_set_cs(orion_spi, 0);
+				orion_spi_set_cs(orion_spi, spi->chip_select, 0);
 				cs_active = 0;
 			}
 		}
 
 msg_done:
 		if (cs_active)
-			orion_spi_set_cs(orion_spi, 0);
+			orion_spi_set_cs(orion_spi, spi->chip_select, 0);
 
 		m->status = status;
 		m->complete(m->context);
@@ -348,7 +369,8 @@ msg_done:
 static int __init orion_spi_reset(struct orion_spi *orion_spi)
 {
 	/* Verify that the CS is deasserted */
-	orion_spi_set_cs(orion_spi, 0);
+	orion_spi_set_cs(orion_spi, 0, 1);
+	orion_spi_set_cs(orion_spi, 1, 1);
 
 	return 0;
 }
