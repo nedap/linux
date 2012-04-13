@@ -45,8 +45,6 @@ static struct mv643xx_eth_platform_data nedap_ax8008_ge00_data = {
 };
 
 static struct mvsdio_platform_data nedap_ax8008_mvsdio_data = {
-	.gpio_write_protect	= 37,
-	.gpio_card_detect	= 38,
 };
 
 static const struct flash_platform_data nedap_ax8008_spi_slave_data = {
@@ -66,8 +64,8 @@ static struct spi_board_info __initdata nedap_ax8008_spi_slave_info[] = {
 
 static struct spi_board_info nedap_ax8008_spi_uart_info[] = {
 	{
-		.modalias	= "max3107",
-		.irq		= (IRQ_KIRKWOOD_GPIO_START + MAX3107_INT),
+		.modalias	= "max3107_console",
+		//.irq		= (IRQ_KIRKWOOD_GPIO_START + MAX3107_INT),
 		.max_speed_hz   = 26000000,
 		.bus_num	= 0,
 		.chip_select	= 1,

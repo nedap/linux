@@ -264,6 +264,13 @@ config SERIAL_MAX3107
 	help
 	  MAX3107 chip support
 
+config SERIAL_MAX3107_CONSOLE
+        tristate "MAX3107 console support"
+        depends on SPI
+        select SERIAL_CORE
+        help
+          MAX3107 chip console support
+
 config SERIAL_DZ
 	bool "DECstation DZ serial driver"
 	depends on MACH_DECSTATION && 32BIT
