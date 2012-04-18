@@ -32,13 +32,15 @@
 #define MAX3107_INT	35
 #define MV_SDA_PIN	43
 #define MV_SCL_PIN	18
-#define PFEW		4
-#define FACTRST		36
-#define DSR0		37
-#define DTR0		38
-#define RI0		41
-#define DCD0		42
-#define STS_LED		39
+#define STS_LED         39
+#define GPIO0		4
+#define GPIO1		36
+#define GPIO2		37
+#define GPIO3		38
+#define GPIO5		40
+#define GPIO8		41
+#define GPIO9		42
+#define GPIO14		44
 
 static struct mv643xx_eth_platform_data nedap_ax8008_ge00_data = {
 	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
@@ -73,19 +75,38 @@ static struct spi_board_info nedap_ax8008_spi_uart_info[] = {
 };
 
 static unsigned int nedap_ax8008_mpp_config[] __initdata = {
-	MPP0_GPIO,  /* SPI FLASH CS */
-        MPP4_GPIO,  /* PFEW */
-	MPP7_GPO, /*MPP7_SPI_SCn,*/ /* SPI UART CS */
-	MPP18_GPO,  /* I2C SCL */
-	MPP35_GPIO, /* SPI UART IRQ */
-        MPP36_GPIO, /* FACT RST */
-	MPP37_GPIO,
-	MPP38_GPIO,
-	MPP39_GPIO, /* STS LED */
-	MPP41_GPIO,
-	MPP42_GPIO,
-	MPP43_GPIO, /* I2C SDA */
-	0
+	MPP0_GPIO,  	/* SPI FLASH CS */
+        MPP1_SPI_MOSI,
+        MPP2_SPI_SCK,
+        MPP3_SPI_MISO,
+        MPP4_GPIO,  	/* GPIO0 */
+        MPP5_GPO,   	/* not used */
+        MPP6_SYSRST_OUTn,
+        MPP7_GPO,   	/* SPI UART CS */
+        MPP8_UART0_RTS,
+        MPP9_UART0_CTS,
+        MPP10_UART0_TXD,
+        MPP11_UART0_RXD,
+        MPP12_SD_CLK,
+        MPP13_SD_CMD,
+        MPP14_SD_D0,
+        MPP15_SD_D1,
+        MPP16_SD_D2,
+        MPP17_SD_D3,
+        MPP18_GPO,  	/* (GPIO6) I2C SCL */
+        MPP19_GPO,  	/* not used */
+
+        MPP35_GPIO, 	/* (GPIO4) SPI UART IRQ */
+        MPP36_GPIO, 	/* GPIO1 */
+        MPP37_GPIO, 	/* GPIO2 */
+        MPP38_GPIO, 	/* GPIO3 */
+        MPP39_GPIO, 	/* (GPIO12) STS LED */
+        MPP40_GPIO, 	/* GPIO5 */
+        MPP41_GPIO, 	/* GPIO8 */
+        MPP42_GPIO, 	/* GPIO9 */
+        MPP43_GPIO, 	/* (GPIO7) I2C SDA */
+        MPP44_GPIO, 	/* GPIO14 */
+        0
 };
 
 static void __init nedap_ax8008_init(void)
@@ -103,14 +124,22 @@ static void __init nedap_ax8008_init(void)
 	gpio_request(SPI_CS1, "spi_cs1");
 	gpio_direction_output(SPI_CS1, 1);
 
-	gpio_request(DTR0, "dtr0");
-	gpio_direction_input(DTR0);
-	gpio_request(DSR0, "dsr0");
-	gpio_direction_input(DSR0);
-	gpio_request(RI0, "ri0");
-	gpio_direction_input(RI0);
-	gpio_request(DCD0, "dcd0");
-	gpio_direction_input(DCD0);
+	gpio_request(GPIO0, "gpio0");
+        gpio_direction_input(GPIO0);
+	gpio_request(GPIO1, "gpio1");
+        gpio_direction_input(GPIO1);
+	gpio_request(GPIO2, "gpio2");
+        gpio_direction_input(GPIO2);
+	gpio_request(GPIO3, "gpio3");
+        gpio_direction_input(GPIO3);
+	gpio_request(GPIO5, "gpio5");
+	gpio_direction_input(GPIO5);
+	gpio_request(GPIO8, "gpio8");
+	gpio_direction_input(GPIO8);
+	gpio_request(GPIO9, "gpio9");
+	gpio_direction_input(GPIO9);
+	gpio_request(GPIO14, "gpio14");
+	gpio_direction_input(GPIO14);
 
 	kirkwood_ehci_init();
 	kirkwood_ge00_init(&nedap_ax8008_ge00_data);
