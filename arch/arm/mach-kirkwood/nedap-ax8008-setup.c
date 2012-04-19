@@ -18,6 +18,8 @@
 #include <linux/spi/flash.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/orion_spi.h>
+#include <linux/i2c.h>
+#include <linux/i2c-gpio.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <mach/kirkwood.h>
@@ -72,6 +74,24 @@ static struct spi_board_info nedap_ax8008_spi_uart_info[] = {
 		.bus_num	= 0,
 		.chip_select	= 1,
 	},
+};
+
+static struct i2c_gpio_platform_data nedap_ax8008_i2c_gpio_data = {
+        .sda_pin        = MV_SDA_PIN,
+        .scl_pin        = MV_SCL_PIN,
+        .scl_is_output_only = 1,
+};
+
+static struct platform_device nedap_ax8008_i2c_gpio = {
+        .name           = "i2c-gpio",
+        .id             = 0,
+        .dev     = {
+                .platform_data  = &nedap_ax8008_i2c_gpio_data,
+        },
+};
+
+static struct platform_device *nedap_ax8008_devices[] __initdata = {
+        &nedap_ax8008_i2c_gpio,
 };
 
 static unsigned int nedap_ax8008_mpp_config[] __initdata = {
@@ -150,6 +170,7 @@ static void __init nedap_ax8008_init(void)
                                 ARRAY_SIZE(nedap_ax8008_spi_uart_info));
 
 	kirkwood_spi_init();
+	platform_add_devices(nedap_ax8008_devices, ARRAY_SIZE(nedap_ax8008_devices));
 	kirkwood_uart0_init();
 	kirkwood_sdio_init(&nedap_ax8008_mvsdio_data);
 }
