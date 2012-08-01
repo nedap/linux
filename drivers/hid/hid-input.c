@@ -279,7 +279,8 @@ static enum power_supply_property hidinput_battery_props[] = {
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_CAPACITY,
 	POWER_SUPPLY_PROP_MODEL_NAME,
-	POWER_SUPPLY_PROP_STATUS
+	POWER_SUPPLY_PROP_STATUS,
+	POWER_SUPPLY_PROP_SCOPE,
 };
 
 #define HID_BATTERY_QUIRK_PERCENT	(1 << 0) /* always reports percent */
@@ -288,6 +289,9 @@ static enum power_supply_property hidinput_battery_props[] = {
 static const struct hid_device_id hid_battery_quirks[] = {
 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_APPLE,
 			       USB_DEVICE_ID_APPLE_ALU_WIRELESS_2011_ANSI),
+	  HID_BATTERY_QUIRK_PERCENT | HID_BATTERY_QUIRK_FEATURE },
+	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_APPLE,
+		USB_DEVICE_ID_APPLE_ALU_WIRELESS_ANSI),
 	  HID_BATTERY_QUIRK_PERCENT | HID_BATTERY_QUIRK_FEATURE },
 	{}
 };
@@ -342,6 +346,10 @@ static int hidinput_get_battery_property(struct power_supply *psy,
 
 	case POWER_SUPPLY_PROP_STATUS:
 		val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
+		break;
+
+	case POWER_SUPPLY_PROP_SCOPE:
+		val->intval = POWER_SUPPLY_SCOPE_DEVICE;
 		break;
 
 	default:
@@ -402,6 +410,8 @@ static bool hidinput_setup_battery(struct hid_device *dev, unsigned report_type,
 		kfree(battery->name);
 		battery->name = NULL;
 	}
+
+	power_supply_powers(battery, &dev->dev);
 
 out:
 	return true;

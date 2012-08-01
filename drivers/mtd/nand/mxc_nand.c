@@ -1219,6 +1219,13 @@ static int __init mxcnd_probe(struct platform_device *pdev)
 	if (nfc_is_v21() && mtd->writesize == 4096)
 		this->ecc.layout = &nandv2_hw_eccoob_4k;
 
+	if (this->ecc.mode == NAND_ECC_HW) {
+		if (nfc_is_v1())
+			this->ecc.strength = 1;
+		else
+			this->ecc.strength = (host->eccsize == 4) ? 4 : 8;
+	}
+
 	/* second phase scan */
 	if (nand_scan_tail(mtd)) {
 		err = -ENXIO;
@@ -1226,8 +1233,8 @@ static int __init mxcnd_probe(struct platform_device *pdev)
 	}
 
 	/* Register the partitions */
-	mtd_device_parse_register(mtd, part_probes, 0,
-			pdata->parts, pdata->nr_parts);
+	mtd_device_parse_register(mtd, part_probes, NULL, pdata->parts,
+				  pdata->nr_parts);
 
 	platform_set_drvdata(pdev, host);
 

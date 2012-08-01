@@ -695,8 +695,12 @@ static int snd_usb_pcm_check_knot(struct snd_pcm_runtime *runtime,
 				  struct snd_usb_substream *subs)
 {
 	struct audioformat *fp;
+	int *rate_list;
 	int count = 0, needs_knot = 0;
 	int err;
+
+	kfree(subs->rate_list.list);
+	subs->rate_list.list = NULL;
 
 	list_for_each_entry(fp, &subs->fmt_list, list) {
 		if (fp->rates & SNDRV_PCM_RATE_CONTINUOUS)
@@ -708,7 +712,8 @@ static int snd_usb_pcm_check_knot(struct snd_pcm_runtime *runtime,
 	if (!needs_knot)
 		return 0;
 
-	subs->rate_list.list = kmalloc(sizeof(int) * count, GFP_KERNEL);
+	subs->rate_list.list = rate_list =
+		kmalloc(sizeof(int) * count, GFP_KERNEL);
 	if (!subs->rate_list.list)
 		return -ENOMEM;
 	subs->rate_list.count = count;
@@ -717,7 +722,7 @@ static int snd_usb_pcm_check_knot(struct snd_pcm_runtime *runtime,
 	list_for_each_entry(fp, &subs->fmt_list, list) {
 		int i;
 		for (i = 0; i < fp->nr_rates; i++)
-			subs->rate_list.list[count++] = fp->rate_table[i];
+			rate_list[count++] = fp->rate_table[i];
 	}
 	err = snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
 					 &subs->rate_list);

@@ -381,11 +381,7 @@ nouveau_fbcon_create(struct nouveau_fbdev *nfbdev,
 		goto out_unref;
 	}
 
-	info->pixmap.size = 64*1024;
-	info->pixmap.buf_align = 8;
-	info->pixmap.access_align = 32;
-	info->pixmap.flags = FB_PIXMAP_SYSTEM;
-	info->pixmap.scan_align = 1;
+	/* Use default scratch pixmap (info->pixmap.flags = FB_PIXMAP_SYSTEM) */
 
 	mutex_unlock(&dev->struct_mutex);
 
@@ -501,7 +497,7 @@ int nouveau_fbcon_init(struct drm_device *dev)
 	nfbdev->helper.funcs = &nouveau_fbcon_helper_funcs;
 
 	ret = drm_fb_helper_init(dev, &nfbdev->helper,
-				 nv_two_heads(dev) ? 2 : 1, 4);
+				 dev->mode_config.num_crtc, 4);
 	if (ret) {
 		kfree(nfbdev);
 		return ret;

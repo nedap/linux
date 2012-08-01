@@ -5,7 +5,7 @@
  *  changes by Thomas Schoebel-Theuer
  */
 
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/time.h>
 #include <linux/mm.h>
 #include <linux/string.h>
@@ -174,6 +174,11 @@ int notify_change(struct dentry * dentry, struct iattr * attr)
 	if (ia_valid & (ATTR_MODE | ATTR_UID | ATTR_GID | ATTR_TIMES_SET)) {
 		if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
 			return -EPERM;
+	}
+
+	if ((ia_valid & ATTR_SIZE) && IS_I_VERSION(inode)) {
+		if (attr->ia_size != inode->i_size)
+			inode_inc_iversion(inode);
 	}
 
 	if ((ia_valid & ATTR_MODE)) {

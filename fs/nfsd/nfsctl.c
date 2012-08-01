@@ -13,12 +13,14 @@
 #include <linux/sunrpc/clnt.h>
 #include <linux/sunrpc/gss_api.h>
 #include <linux/sunrpc/gss_krb5_enctypes.h>
+#include <linux/sunrpc/rpc_pipe_fs.h>
 #include <linux/module.h>
 
 #include "idmap.h"
 #include "nfsd.h"
 #include "cache.h"
 #include "fault_inject.h"
+#include "netns.h"
 
 /*
  *	We have a single directory with several nodes in it.
@@ -223,7 +225,7 @@ static ssize_t write_unlock_ip(struct file *file, char *buf, size_t size)
 	if (qword_get(&buf, fo_path, size) < 0)
 		return -EINVAL;
 
-	if (rpc_pton(fo_path, size, sap, salen) == 0)
+	if (rpc_pton(&init_net, fo_path, size, sap, salen) == 0)
 		return -EINVAL;
 
 	return nlmsvc_unlock_all_by_ip(sap);
@@ -649,6 +651,7 @@ static ssize_t __write_ports_addfd(char *buf)
 {
 	char *mesg = buf;
 	int fd, err;
+	struct net *net = &init_net;
 
 	err = get_int(&mesg, &fd);
 	if (err != 0 || fd < 0)
@@ -660,6 +663,8 @@ static ssize_t __write_ports_addfd(char *buf)
 
 	err = svc_addsock(nfsd_serv, fd, buf, SIMPLE_TRANSACTION_LIMIT);
 	if (err < 0) {
+		if (nfsd_serv->sv_nrthreads == 1)
+			svc_shutdown_net(nfsd_serv, net);
 		svc_destroy(nfsd_serv);
 		return err;
 	}
@@ -697,6 +702,7 @@ static ssize_t __write_ports_addxprt(char *buf)
 	char transport[16];
 	struct svc_xprt *xprt;
 	int port, err;
+	struct net *net = &init_net;
 
 	if (sscanf(buf, "%15s %4u", transport, &port) != 2)
 		return -EINVAL;
@@ -708,12 +714,12 @@ static ssize_t __write_ports_addxprt(char *buf)
 	if (err != 0)
 		return err;
 
-	err = svc_create_xprt(nfsd_serv, transport, &init_net,
+	err = svc_create_xprt(nfsd_serv, transport, net,
 				PF_INET, port, SVC_SOCK_ANONYMOUS);
 	if (err < 0)
 		goto out_err;
 
-	err = svc_create_xprt(nfsd_serv, transport, &init_net,
+	err = svc_create_xprt(nfsd_serv, transport, net,
 				PF_INET6, port, SVC_SOCK_ANONYMOUS);
 	if (err < 0 && err != -EAFNOSUPPORT)
 		goto out_close;
@@ -722,12 +728,14 @@ static ssize_t __write_ports_addxprt(char *buf)
 	nfsd_serv->sv_nrthreads--;
 	return 0;
 out_close:
-	xprt = svc_find_xprt(nfsd_serv, transport, PF_INET, port);
+	xprt = svc_find_xprt(nfsd_serv, transport, net, PF_INET, port);
 	if (xprt != NULL) {
 		svc_close_xprt(xprt);
 		svc_xprt_put(xprt);
 	}
 out_err:
+	if (nfsd_serv->sv_nrthreads == 1)
+		svc_shutdown_net(nfsd_serv, net);
 	svc_destroy(nfsd_serv);
 	return err;
 }
@@ -748,7 +756,7 @@ static ssize_t __write_ports_delxprt(char *buf)
 	if (port < 1 || port > USHRT_MAX || nfsd_serv == NULL)
 		return -EINVAL;
 
-	xprt = svc_find_xprt(nfsd_serv, transport, AF_UNSPEC, port);
+	xprt = svc_find_xprt(nfsd_serv, transport, &init_net, AF_UNSPEC, port);
 	if (xprt == NULL)
 		return -ENOTCONN;
 
@@ -1124,14 +1132,26 @@ static int create_proc_exports_entry(void)
 }
 #endif
 
+int nfsd_net_id;
+static struct pernet_operations nfsd_net_ops = {
+	.id   = &nfsd_net_id,
+	.size = sizeof(struct nfsd_net),
+};
+
 static int __init init_nfsd(void)
 {
 	int retval;
 	printk(KERN_INFO "Installing knfsd (copyright (C) 1996 okir@monad.swb.de).\n");
 
-	retval = nfsd4_init_slabs();
+	retval = register_cld_notifier();
 	if (retval)
 		return retval;
+	retval = register_pernet_subsys(&nfsd_net_ops);
+	if (retval < 0)
+		goto out_unregister_notifier;
+	retval = nfsd4_init_slabs();
+	if (retval)
+		goto out_unregister_pernet;
 	nfs4_state_init();
 	retval = nfsd_fault_inject_init(); /* nfsd fault injection controls */
 	if (retval)
@@ -1169,6 +1189,10 @@ out_free_stat:
 	nfsd_fault_inject_cleanup();
 out_free_slabs:
 	nfsd4_free_slabs();
+out_unregister_pernet:
+	unregister_pernet_subsys(&nfsd_net_ops);
+out_unregister_notifier:
+	unregister_cld_notifier();
 	return retval;
 }
 
@@ -1184,6 +1208,8 @@ static void __exit exit_nfsd(void)
 	nfsd4_free_slabs();
 	nfsd_fault_inject_cleanup();
 	unregister_filesystem(&nfsd_fs_type);
+	unregister_pernet_subsys(&nfsd_net_ops);
+	unregister_cld_notifier();
 }
 
 MODULE_AUTHOR("Olaf Kirch <okir@monad.swb.de>");

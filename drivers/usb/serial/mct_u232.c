@@ -88,7 +88,6 @@ static struct usb_driver mct_u232_driver = {
 	.probe =	usb_serial_probe,
 	.disconnect =	usb_serial_disconnect,
 	.id_table =	id_table_combined,
-	.no_dynamic_id = 	1,
 };
 
 static struct usb_serial_driver mct_u232_device = {
@@ -97,7 +96,6 @@ static struct usb_serial_driver mct_u232_device = {
 		.name =		"mct_u232",
 	},
 	.description =	     "MCT U232",
-	.usb_driver = 	     &mct_u232_driver,
 	.id_table =	     id_table_combined,
 	.num_ports =	     1,
 	.open =		     mct_u232_open,
@@ -114,6 +112,10 @@ static struct usb_serial_driver mct_u232_device = {
 	.release =	     mct_u232_release,
 	.ioctl =             mct_u232_ioctl,
 	.get_icount =        mct_u232_get_icount,
+};
+
+static struct usb_serial_driver * const serial_drivers[] = {
+	&mct_u232_device, NULL
 };
 
 struct mct_u232_private {
@@ -315,13 +317,16 @@ static int mct_u232_set_modem_ctrl(struct usb_serial *serial,
 			MCT_U232_SET_REQUEST_TYPE,
 			0, 0, buf, MCT_U232_SET_MODEM_CTRL_SIZE,
 			WDR_TIMEOUT);
-	if (rc < 0)
-		dev_err(&serial->dev->dev,
-			"Set MODEM CTRL 0x%x failed (error = %d)\n", mcr, rc);
+	kfree(buf);
+
 	dbg("set_modem_ctrl: state=0x%x ==> mcr=0x%x", control_state, mcr);
 
-	kfree(buf);
-	return rc;
+	if (rc < 0) {
+		dev_err(&serial->dev->dev,
+			"Set MODEM CTRL 0x%x failed (error = %d)\n", mcr, rc);
+		return rc;
+	}
+	return 0;
 } /* mct_u232_set_modem_ctrl */
 
 static int mct_u232_get_modem_stat(struct usb_serial *serial,
@@ -904,33 +909,7 @@ static int  mct_u232_get_icount(struct tty_struct *tty,
 	return 0;
 }
 
-static int __init mct_u232_init(void)
-{
-	int retval;
-	retval = usb_serial_register(&mct_u232_device);
-	if (retval)
-		goto failed_usb_serial_register;
-	retval = usb_register(&mct_u232_driver);
-	if (retval)
-		goto failed_usb_register;
-	printk(KERN_INFO KBUILD_MODNAME ": " DRIVER_VERSION ":"
-	       DRIVER_DESC "\n");
-	return 0;
-failed_usb_register:
-	usb_serial_deregister(&mct_u232_device);
-failed_usb_serial_register:
-	return retval;
-}
-
-
-static void __exit mct_u232_exit(void)
-{
-	usb_deregister(&mct_u232_driver);
-	usb_serial_deregister(&mct_u232_device);
-}
-
-module_init(mct_u232_init);
-module_exit(mct_u232_exit);
+module_usb_serial_driver(mct_u232_driver, serial_drivers);
 
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
