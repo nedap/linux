@@ -483,6 +483,14 @@ config GPIO_74X164
 	  8-outputs shift registers. This driver can be used to provide access
 	  to more gpio outputs.
 
+config GPIO_74HC4094
+	tristate "74HC4094 GPIO based 8-bits shift register"
+	depends on SPI_MASTER
+	help
+	  Platform driver for 74HC4094 compatible GPIO based
+	  8-outputs shift registers. This driver can be used to provide access
+	  to more gpio outputs through the shift register.
+
 comment "AC97 GPIO expanders:"
 
 config GPIO_UCB1400

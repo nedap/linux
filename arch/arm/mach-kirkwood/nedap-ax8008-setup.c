@@ -20,6 +20,7 @@
 #include <linux/spi/orion_spi.h>
 #include <linux/i2c.h>
 #include <linux/i2c-gpio.h>
+#include <linux/spi/74hc4094.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <mach/kirkwood.h>
@@ -36,9 +37,9 @@
 #define MV_SCL_PIN	18
 #define STS_LED         39
 #define GPIO0		4
-#define GPIO1		36
-#define GPIO2		37
-#define GPIO3		38
+#define SHIFT_DATA_PIN	36
+#define SHIFT_CLK_PIN	37
+#define SHIFT_STRB_PIN	38
 #define GPIO5		40
 #define GPIO8		41
 #define GPIO9		42
@@ -51,7 +52,7 @@ static struct mv643xx_eth_platform_data nedap_ax8008_ge00_data = {
 static struct mvsdio_platform_data nedap_ax8008_mvsdio_data = {
 };
 
-static const struct flash_platform_data nedap_ax8008_spi_slave_data = {
+static struct flash_platform_data nedap_ax8008_spi_slave_data = {
         .type	= "m25p128",
 };
 
@@ -76,6 +77,23 @@ static struct spi_board_info nedap_ax8008_spi_uart_info[] = {
 	},
 };
 
+static struct gen_74hc4094_chip_platform_data nedap_ax8008_gpio_shift_register = {
+	.ngpio           = 8,
+	.base            = 100,
+	.mask            = 0xE0,
+	.gpio_pin_data   = SHIFT_DATA_PIN,
+	.gpio_pin_clk    = SHIFT_CLK_PIN,
+	.gpio_pin_strobe = SHIFT_STRB_PIN,
+};
+
+static struct platform_device nedap_ax8008_gpio_info = {
+	.name	= "74hc4094",
+	.id	= 0,
+	.dev	= {
+		.platform_data  = &nedap_ax8008_gpio_shift_register,
+	},
+};
+
 static struct i2c_gpio_platform_data nedap_ax8008_i2c_gpio_data = {
         .sda_pin        = MV_SDA_PIN,
         .scl_pin        = MV_SCL_PIN,
@@ -83,15 +101,16 @@ static struct i2c_gpio_platform_data nedap_ax8008_i2c_gpio_data = {
 };
 
 static struct platform_device nedap_ax8008_i2c_gpio = {
-        .name           = "i2c-gpio",
-        .id             = 0,
-        .dev     = {
-                .platform_data  = &nedap_ax8008_i2c_gpio_data,
-        },
+	.name           = "i2c-gpio",
+	.id             = 0,
+	.dev     = {
+		.platform_data  = &nedap_ax8008_i2c_gpio_data,
+	},
 };
 
 static struct platform_device *nedap_ax8008_devices[] __initdata = {
-        &nedap_ax8008_i2c_gpio,
+	&nedap_ax8008_i2c_gpio,
+	&nedap_ax8008_gpio_info,
 };
 
 static unsigned int nedap_ax8008_mpp_config[] __initdata = {
@@ -117,9 +136,9 @@ static unsigned int nedap_ax8008_mpp_config[] __initdata = {
         MPP19_GPO,  	/* not used */
 
         MPP35_GPIO, 	/* (GPIO4) SPI UART IRQ */
-        MPP36_GPIO, 	/* GPIO1 */
-        MPP37_GPIO, 	/* GPIO2 */
-        MPP38_GPIO, 	/* GPIO3 */
+        MPP36_GPIO, 	/* SHIFT_DATA_PIN */
+        MPP37_GPIO, 	/* SHIFT_CLK_PIN */
+        MPP38_GPIO, 	/* SHIFT_STRB_PIN */
         MPP39_GPIO, 	/* (GPIO12) STS LED */
         MPP40_GPIO, 	/* GPIO5 */
         MPP41_GPIO, 	/* GPIO8 */
@@ -145,13 +164,7 @@ static void __init nedap_ax8008_init(void)
 	gpio_direction_output(SPI_CS1, 1);
 
 	gpio_request(GPIO0, "gpio0");
-        gpio_direction_input(GPIO0);
-	gpio_request(GPIO1, "gpio1");
-        gpio_direction_input(GPIO1);
-	gpio_request(GPIO2, "gpio2");
-        gpio_direction_input(GPIO2);
-	gpio_request(GPIO3, "gpio3");
-        gpio_direction_input(GPIO3);
+	gpio_direction_input(GPIO0);
 	gpio_request(GPIO5, "gpio5");
 	gpio_direction_input(GPIO5);
 	gpio_request(GPIO8, "gpio8");
