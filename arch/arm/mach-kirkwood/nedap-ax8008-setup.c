@@ -70,7 +70,7 @@ static struct spi_board_info __initdata nedap_ax8008_spi_slave_info[] = {
 static struct spi_board_info nedap_ax8008_spi_uart_info[] = {
 	{
 		.modalias	= "max3107_console",
-		//.irq		= (IRQ_KIRKWOOD_GPIO_START + MAX3107_INT),
+		.irq		= (IRQ_KIRKWOOD_GPIO_START + MAX3107_INT),
 		.max_speed_hz   = 26000000,
 		.bus_num	= 0,
 		.chip_select	= 1,
