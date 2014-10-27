@@ -526,7 +526,7 @@ static void max3107_register_init(struct max3107_port *s)
 		s->brg_cfg = MAX3107_EXT_B115200;
 		s->baud_tbl = (struct baud_table *)baud_table_ext;
 	} else {
-		s->brg_cfg = MAX3107_INT_IB115200;
+		s->brg_cfg = MAX3107_INT_B115200;
 		s->baud_tbl = (struct baud_table *)baud_table_int;
 	}
 
