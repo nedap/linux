@@ -39,35 +39,35 @@
 #include <linux/module.h>
 #include "max3107.h"
 
-static const struct baud_table brg25_ext[] = {
-	{ 300,    MAX3107_BRG25_B300 },
-	{ 600,    MAX3107_BRG25_B600 },
-	{ 1200,   MAX3107_BRG25_B1200 },
-	{ 2400,   MAX3107_BRG25_B2400 },
-	{ 4800,   MAX3107_BRG25_B4800 },
-	{ 9600,   MAX3107_BRG25_B9600 },
-	{ 19200,  MAX3107_BRG25_B19200 },
-	{ 57600,  MAX3107_BRG25_B57600 },
-	{ 115200, MAX3107_BRG25_B115200 },
-	{ 230400, MAX3107_BRG25_B230400 },
-	{ 460800, MAX3107_BRG25_B460800 },
-	{ 921600, MAX3107_BRG25_B921600 },
+static const struct baud_table baud_table_ext[] = {
+	{ 300,    MAX3107_EXT_B300 },
+	{ 600,    MAX3107_EXT_B600 },
+	{ 1200,   MAX3107_EXT_B1200 },
+	{ 2400,   MAX3107_EXT_B2400 },
+	{ 4800,   MAX3107_EXT_B4800 },
+	{ 9600,   MAX3107_EXT_B9600 },
+	{ 19200,  MAX3107_EXT_B19200 },
+	{ 57600,  MAX3107_EXT_B57600 },
+	{ 115200, MAX3107_EXT_B115200 },
+	{ 230400, MAX3107_EXT_B230400 },
+	{ 460800, MAX3107_EXT_B460800 },
+	{ 921600, MAX3107_EXT_B921600 },
 	{ 0, 0 }
 };
 
-static const struct baud_table brg06_int[] = {
-	{ 300,    MAX3107_BRG06_IB300 },
-	{ 600,    MAX3107_BRG06_IB600 },
-	{ 1200,   MAX3107_BRG06_IB1200 },
-	{ 2400,   MAX3107_BRG06_IB2400 },
-	{ 4800,   MAX3107_BRG06_IB4800 },
-	{ 9600,   MAX3107_BRG06_IB9600 },
-	{ 19200,  MAX3107_BRG06_IB19200 },
-	{ 57600,  MAX3107_BRG06_IB57600 },
-	{ 115200, MAX3107_BRG06_IB115200 },
-	{ 230400, MAX3107_BRG06_IB230400 },
-	{ 460800, MAX3107_BRG06_IB460800 },
-	{ 921600, MAX3107_BRG06_IB921600 },
+static const struct baud_table baud_table_int[] = {
+	{ 300,    MAX3107_INT_B300 },
+	{ 600,    MAX3107_INT_B600 },
+	{ 1200,   MAX3107_INT_B1200 },
+	{ 2400,   MAX3107_INT_B2400 },
+	{ 4800,   MAX3107_INT_B4800 },
+	{ 9600,   MAX3107_INT_B9600 },
+	{ 19200,  MAX3107_INT_B19200 },
+	{ 57600,  MAX3107_INT_B57600 },
+	{ 115200, MAX3107_INT_B115200 },
+	{ 230400, MAX3107_INT_B230400 },
+	{ 460800, MAX3107_INT_B460800 },
+	{ 921600, MAX3107_INT_B921600 },
 	{ 0, 0 }
 };
 
@@ -523,11 +523,11 @@ static void max3107_register_init(struct max3107_port *s)
 	s->baud = 115200;
 	/* the below is default*/
 	if (s->ext_clk) {
-		s->brg_cfg = MAX3107_BRG25_B115200;
-		s->baud_tbl = (struct baud_table *)brg25_ext;
+		s->brg_cfg = MAX3107_EXT_B115200;
+		s->baud_tbl = (struct baud_table *)baud_table_ext;
 	} else {
-		s->brg_cfg = MAX3107_BRG06_IB115200;
-		s->baud_tbl = (struct baud_table *)brg06_int;
+		s->brg_cfg = MAX3107_INT_IB115200;
+		s->baud_tbl = (struct baud_table *)baud_table_int;
 	}
 
 	if (s->pdata->init)
