@@ -355,6 +355,50 @@
 #define MAX3107_BRG13_IB460800	(0x000000 | 0x00)
 #define MAX3107_BRG13_IB921600	(0x000000 | 0x00)
 
+/*
+	Calculate MAX3107_BRGxx_xxxxx value:
+		Fref = 25000000;
+		baudrate = 115200;
+		factor = Fref / (16 * baudrate);
+		DIV = int(factor);
+		FRAC = round(16 * (factor - DIV));
+		#define MAX3107_BRGxx_xxxxx (DIV << 16 | FRAC)
+
+	Deviation:
+		factorActual = DIV + FRAC / 16;
+		baudrateActual = Fref / (16 * factorActual);
+		deviation = 100 * ((baudrateActual - baudrate) / baudrate);
+*/
+
+/* Baud rate generator configuration values for external clock 25MHz */
+#define MAX3107_BRG25_B300	(0x145800 | 0x05)	/* deviation   0.00% */
+#define MAX3107_BRG25_B600	(0x0A2C00 | 0x03)	/* deviation  -0.00% */
+#define MAX3107_BRG25_B1200	(0x051600 | 0x01)	/* deviation   0.00% */
+#define MAX3107_BRG25_B2400	(0x028B00 | 0x01)	/* deviation  -0.00% */
+#define MAX3107_BRG25_B4800	(0x014500 | 0x08)	/* deviation   0.01% */
+#define MAX3107_BRG25_B9600	(0x00A200 | 0x0C)	/* deviation   0.01% */
+#define MAX3107_BRG25_B19200	(0x005100 | 0x06)	/* deviation   0.01% */
+#define MAX3107_BRG25_B38400	(0x002800 | 0x0B)	/* deviation   0.01% */
+#define MAX3107_BRG25_B57600	(0x001B00 | 0x02)	/* deviation   0.01% */
+#define MAX3107_BRG25_B115200	(0x000D00 | 0x09)	/* deviation   0.01% */
+#define MAX3107_BRG25_B230400	(0x000600 | 0x0D)	/* deviation  -0.45% */
+#define MAX3107_BRG25_B460800	(0x000300 | 0x06)	/* deviation   0.47% */
+#define MAX3107_BRG25_B921600	(0x000100 | 0x0B)	/* deviation   0.47% */
+
+/* Baud rate generator configuration values for internal clock 614.4KHz */
+#define MAX3107_BRG06_IB300	(0x008000 | 0x00)	/* deviation   0.00% */
+#define MAX3107_BRG06_IB600	(0x004000 | 0x00)	/* deviation   0.00% */
+#define MAX3107_BRG06_IB1200	(0x002000 | 0x00)	/* deviation   0.00% */
+#define MAX3107_BRG06_IB2400	(0x001000 | 0x00)	/* deviation   0.00% */
+#define MAX3107_BRG06_IB4800	(0x000800 | 0x00)	/* deviation   0.00% */
+#define MAX3107_BRG06_IB9600	(0x000400 | 0x00)	/* deviation   0.00% */
+#define MAX3107_BRG06_IB19200	(0x000200 | 0x00)	/* deviation   0.00% */
+#define MAX3107_BRG06_IB38400	(0x000100 | 0x00)	/* deviation   0.00% */
+#define MAX3107_BRG06_IB57600	(0x000000 | 0x0B)	/* deviation  -3.03% */
+#define MAX3107_BRG06_IB115200	(0x000000 | 0x05)	/* deviation   6.67% */
+#define MAX3107_BRG06_IB230400	(0x000000 | 0x03)	/* deviation -11.11% */
+#define MAX3107_BRG06_IB460800	(0x000000 | 0x01)	/* deviation  33.33% */
+#define MAX3107_BRG06_IB921600	(0x000000 | 0x01)	/* deviation -33.33% */
 
 struct baud_table {
 	int baud;
