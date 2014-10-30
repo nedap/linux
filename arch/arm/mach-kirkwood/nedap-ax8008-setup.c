@@ -204,7 +204,29 @@ static int __init nedap_ax8008_pci_init(void)
 subsys_initcall(nedap_ax8008_pci_init);
 
 MACHINE_START(NEDAP_AX8008, "Nedap AX8008 Board")
-	/* Maintainer: Dirkjan Bussink <dirkjan.bussink@nedap.com> */
+	/* Maintainer: Jaap de Jong <jaap.dejong@nedap.com> */
+	.atag_offset	= 0x100,
+	.init_machine	= nedap_ax8008_init,
+	.map_io		= kirkwood_map_io,
+	.init_early	= kirkwood_init_early,
+	.init_irq	= kirkwood_init_irq,
+	.timer		= &kirkwood_timer,
+	.restart	= kirkwood_restart,
+MACHINE_END
+
+MACHINE_START(NEDAP_AX8008M, "Nedap AX8008M Board")
+	/* Maintainer: Jaap de Jong <jaap.dejong@nedap.com> */
+	.atag_offset	= 0x100,
+	.init_machine	= nedap_ax8008_init,
+	.map_io		= kirkwood_map_io,
+	.init_early	= kirkwood_init_early,
+	.init_irq	= kirkwood_init_irq,
+	.timer		= &kirkwood_timer,
+	.restart	= kirkwood_restart,
+MACHINE_END
+
+MACHINE_START(NEDAP_AX8008MR, "Nedap AX8008MR Board")
+	/* Maintainer: Jaap de Jong <jaap.dejong@nedap.com> */
 	.atag_offset	= 0x100,
 	.init_machine	= nedap_ax8008_init,
 	.map_io		= kirkwood_map_io,
