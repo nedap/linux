@@ -190,15 +190,14 @@ static void __init nedap_ax8008_init(void)
 
 static int __init nedap_ax8008_pci_init(void)
 {
-	if (machine_is_nedap_ax8008()) {
-		u32 dev, rev;
+	u32 dev, rev;
 
-		kirkwood_pcie_id(&dev, &rev);
-		if (dev == MV88F6282_DEV_ID)
-			kirkwood_pcie_init(KW_PCIE1 | KW_PCIE0);
-		else
-			kirkwood_pcie_init(KW_PCIE0);
-	}
+	kirkwood_pcie_id(&dev, &rev);
+	if (dev == MV88F6282_DEV_ID)
+		kirkwood_pcie_init(KW_PCIE1 | KW_PCIE0);
+	else
+		kirkwood_pcie_init(KW_PCIE0);
+
 	return 0;
 }
 subsys_initcall(nedap_ax8008_pci_init);
