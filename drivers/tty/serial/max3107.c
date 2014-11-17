@@ -39,35 +39,35 @@
 #include <linux/module.h>
 #include "max3107.h"
 
-static const struct baud_table baud_table_ext[] = {
-	{ 300,    MAX3107_EXT_B300 },
-	{ 600,    MAX3107_EXT_B600 },
-	{ 1200,   MAX3107_EXT_B1200 },
-	{ 2400,   MAX3107_EXT_B2400 },
-	{ 4800,   MAX3107_EXT_B4800 },
-	{ 9600,   MAX3107_EXT_B9600 },
-	{ 19200,  MAX3107_EXT_B19200 },
-	{ 57600,  MAX3107_EXT_B57600 },
-	{ 115200, MAX3107_EXT_B115200 },
-	{ 230400, MAX3107_EXT_B230400 },
-	{ 460800, MAX3107_EXT_B460800 },
-	{ 921600, MAX3107_EXT_B921600 },
+static const struct baud_table brg26_ext[] = {
+	{ 300,    MAX3107_BRG26_B300 },
+	{ 600,    MAX3107_BRG26_B600 },
+	{ 1200,   MAX3107_BRG26_B1200 },
+	{ 2400,   MAX3107_BRG26_B2400 },
+	{ 4800,   MAX3107_BRG26_B4800 },
+	{ 9600,   MAX3107_BRG26_B9600 },
+	{ 19200,  MAX3107_BRG26_B19200 },
+	{ 57600,  MAX3107_BRG26_B57600 },
+	{ 115200, MAX3107_BRG26_B115200 },
+	{ 230400, MAX3107_BRG26_B230400 },
+	{ 460800, MAX3107_BRG26_B460800 },
+	{ 921600, MAX3107_BRG26_B921600 },
 	{ 0, 0 }
 };
 
-static const struct baud_table baud_table_int[] = {
-	{ 300,    MAX3107_INT_B300 },
-	{ 600,    MAX3107_INT_B600 },
-	{ 1200,   MAX3107_INT_B1200 },
-	{ 2400,   MAX3107_INT_B2400 },
-	{ 4800,   MAX3107_INT_B4800 },
-	{ 9600,   MAX3107_INT_B9600 },
-	{ 19200,  MAX3107_INT_B19200 },
-	{ 57600,  MAX3107_INT_B57600 },
-	{ 115200, MAX3107_INT_B115200 },
-	{ 230400, MAX3107_INT_B230400 },
-	{ 460800, MAX3107_INT_B460800 },
-	{ 921600, MAX3107_INT_B921600 },
+static const struct baud_table brg13_int[] = {
+	{ 300,    MAX3107_BRG13_IB300 },
+	{ 600,    MAX3107_BRG13_IB600 },
+	{ 1200,   MAX3107_BRG13_IB1200 },
+	{ 2400,   MAX3107_BRG13_IB2400 },
+	{ 4800,   MAX3107_BRG13_IB4800 },
+	{ 9600,   MAX3107_BRG13_IB9600 },
+	{ 19200,  MAX3107_BRG13_IB19200 },
+	{ 57600,  MAX3107_BRG13_IB57600 },
+	{ 115200, MAX3107_BRG13_IB115200 },
+	{ 230400, MAX3107_BRG13_IB230400 },
+	{ 460800, MAX3107_BRG13_IB460800 },
+	{ 921600, MAX3107_BRG13_IB921600 },
 	{ 0, 0 }
 };
 
@@ -519,15 +519,15 @@ static void max3107_register_init(struct max3107_port *s)
 {
 	u16 buf[11];	/* Buffer for SPI transfers */
 
-	/* 1. Configure baud rate, 115200 as default */
-	s->baud = 115200;
+	/* 1. Configure baud rate, 9600 as default */
+	s->baud = 9600;
 	/* the below is default*/
 	if (s->ext_clk) {
-		s->brg_cfg = MAX3107_EXT_B115200;
-		s->baud_tbl = (struct baud_table *)baud_table_ext;
+		s->brg_cfg = MAX3107_BRG26_B9600;
+		s->baud_tbl = (struct baud_table *)brg26_ext;
 	} else {
-		s->brg_cfg = MAX3107_INT_B115200;
-		s->baud_tbl = (struct baud_table *)baud_table_int;
+		s->brg_cfg = MAX3107_BRG13_IB9600;
+		s->baud_tbl = (struct baud_table *)brg13_int;
 	}
 
 	if (s->pdata->init)
@@ -1038,15 +1038,6 @@ int max3107_probe(struct spi_device *spi, struct max3107_plat *pdata)
 		goto err_free1;
 	}
 
-	/* Uboot has set the clock already, use it here */
-	buf[0] = MAX3107_CLKSRC_REG;
-	if (max3107_rw(s, (u8 *)buf, (u8 *)buf, 2)) {
-		dev_err(&s->spi->dev, "SPI transfer for CLKSRC handling failed\n");
-		retval = -EIO;
-		goto err_free1;
-	}
-	s->ext_clk = pdata->ext_clk = (buf[0] &= 0x10) ? 1 : 0;
-
 	/* Disable all interrupts */
 	buf[0] = (MAX3107_WRITE_BIT | MAX3107_IRQEN_REG | 0x0000);
 	buf[0] |= 0x0000;
@@ -1056,13 +1047,6 @@ int max3107_probe(struct spi_device *spi, struct max3107_plat *pdata)
 	if (s->ext_clk) {
 		/* External clock */
 		buf[1] |= MAX3107_CLKSRC_EXTCLK_BIT;
-		buf[1] |= MAX3107_CLKSRC_PLLBYP_BIT;
-		pr_info(PR_FMT "Using external 25MHz clock\n");
-	} else {
-		/* Internal clock */
-		buf[1] |= MAX3107_CLKSRC_INTOSC_BIT;
-		buf[1] |= MAX3107_CLKSRC_PLL_BIT;
-		pr_info(PR_FMT "Using internal 614.4kHz clock\n");
 	}
 
 	/* PLL bypass ON */
@@ -1090,7 +1074,7 @@ int max3107_probe(struct spi_device *spi, struct max3107_plat *pdata)
 	s->port.ops = &max3107_ops;
 	s->port.line = 0;
 	s->port.dev = &spi->dev;
-	s->port.uartclk = 115200;
+	s->port.uartclk = 9600;
 	s->port.flags = UPF_SKIP_TEST | UPF_BOOT_AUTOCONF;
 	s->port.irq = s->spi->irq;
 	s->port.type = PORT_MAX3107;
