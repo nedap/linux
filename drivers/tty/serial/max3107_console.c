@@ -2,7 +2,7 @@
  * max3107_console.c - spi uart protocol driver for Maxim 3107
  * Based on max3110.c, with console support
  *
- * Copyright (c) 2009, Intel Corporation.
+ * Copyright (c) 2008-2010, Intel Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -19,33 +19,38 @@
  */
 
 /*
- * NOTE: currently only working on 115200
- * TODO: enabling IRQ can cause system hang
-*/
+ * Note:
+ * 1. From Max3107 spec, the Rx FIFO has 8 words, while the Tx FIFO only has
+ *    1 word. If SPI master controller doesn't support sclk frequency change,
+ *    then the char need be sent out one by one with some delay
+ *
+ * 2. Currently only RX available interrupt is used, no need for waiting TXE
+ *    interrupt for a low speed UART device
+ */
+
+#ifdef CONFIG_MAGIC_SYSRQ
+#define SUPPORT_SYSRQ
+#endif
 
 #include <linux/module.h>
 #include <linux/ioport.h>
+#include <linux/irq.h>
 #include <linux/init.h>
 #include <linux/console.h>
-#include <linux/gpio.h>
-#include <linux/platform_device.h>
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
 #include <linux/serial_core.h>
 #include <linux/serial_reg.h>
-#include <linux/unistd.h>
 
 #include <linux/kthread.h>
-#include <linux/delay.h>
 #include <asm/atomic.h>
 #include <linux/spi/spi.h>
 
-#include "max3107.h"
+#include "max3107_console.h"
 
 #define PR_FMT	"max3107_console: "
 #define WORDS_PER_XFER  128
 #define MAX_READ_LEN    128
-#define MAX3107_CONSOLE_BRG13_IB115200 (0x000200 | 0x00)
 
 struct uart_max3107 {
 	struct uart_port port;
@@ -94,8 +99,8 @@ int max3107_write_then_read(struct uart_max3107 *max,
 	if (!txbuf || !rxbuf)
 		return -EINVAL;
 
-	etx[0]=txbuf[1];
-	etx[1]=txbuf[0];
+	etx[0] = txbuf[1];
+	etx[1] = txbuf[0];
 
 	spi_message_init(&message);
 	memset(&x, 0, sizeof x);
@@ -109,14 +114,14 @@ int max3107_write_then_read(struct uart_max3107 *max,
 
 	/* Do the i/o */
 	ret = spi_sync(spi, &message);
-        rxbuf[0]=erx[1];
-        rxbuf[1]=erx[0];
+        rxbuf[0] = erx[1];
+        rxbuf[1] = erx[0];
 
 	return ret;
 }
 
 /* Write a u16 to the device, and return one u16 read back */
-int max3107_out(struct uart_max3107 *max, const u16 out)
+static int max3107_out(struct uart_max3107 *max, const u16 out)
 {
 	u16 tmp;
 	int ret;
@@ -127,7 +132,7 @@ int max3107_out(struct uart_max3107 *max, const u16 out)
 
 	/* If some valid data is read back */
 	if (tmp) {
-		if(tmp &= 0xff) {
+		if (tmp &= 0xff) {
 			receive_chars(max, (unsigned char *)&tmp, 1);
 		}
 	}
@@ -243,7 +248,7 @@ static struct tty_driver *serial_m3107_con_device(struct console *co,
 
 static struct uart_driver serial_m3107_reg;
 static struct console serial_m3107_console = {
-	.name		= "ttyMAX",//"ttyS",
+	.name		= "ttyMAX",
 	.write		= serial_m3107_con_write,
 	.device		= serial_m3107_con_device,
 	.setup		= serial_m3107_con_setup,
@@ -393,7 +398,8 @@ static void max3107_con_receive(struct uart_max3107 *max)
 	do {
 		/* Start by reading current RX FIFO level */
 		config = MAX3107_RXFIFOLVL_REG;
-		max3107_write_then_read(max, (u8 *)&config, (u8 *)&tmp, 2, 1);			len = (tmp & MAX3107_SPI_RX_DATA_MASK);
+		max3107_write_then_read(max, (u8 *)&config, (u8 *)&tmp, 2, 1);
+		len = (tmp & MAX3107_SPI_RX_DATA_MASK);
 
 		/* 3107 RX buffer is 128 words */
 		num = max3107_read_multi(max, len, pbuf);
@@ -500,6 +506,17 @@ static int max3107_read_thread(void *_max)
 }
 
 
+static int m3107_ext_clk(struct uart_max3107 *max)
+{
+	u16 config = 0;
+	u16 tmp;
+
+	/* Uboot has set the clock already, use it here */
+	config = MAX3107_CLKSRC_REG;
+	max3107_write_then_read(max, (u8 *)&config, (u8 *)&tmp, 2, 1);
+	return (tmp & 0x10) ? 1 : 0;
+}
+
 static int serial_m3107_startup(struct uart_port *port)
 {
 	struct uart_max3107 *max =
@@ -524,18 +541,24 @@ static int serial_m3107_startup(struct uart_port *port)
 	}
 
 	/* Disable all interrupts */
-	config = (MAX3107_WRITE_BIT | MAX3107_IRQEN_REG | 0x0000);
-	config |= 0x0000;
+	config = (MAX3107_WRITE_BIT | MAX3107_IRQEN_REG);
 
 	/* Perform SPI transfer */
 	ret = max3107_out(max, config);
 
 	/* Configure clock source */
 	config = (MAX3107_WRITE_BIT | MAX3107_CLKSRC_REG);
-	/* Internal clock */
-	config |= MAX3107_CLKSRC_INTOSC_BIT;
-	config |= MAX3107_CLKSRC_PLL_BIT;
-	//config |= MAX3107_CLKSRC_CLK2RTS_BIT; // for test only!!!
+	if (m3107_ext_clk(max)) {
+		/* External clock */
+		config |= MAX3107_CLKSRC_EXTCLK_BIT;
+		config |= MAX3107_CLKSRC_PLLBYP_BIT;
+		pr_info(PR_FMT "Using external 25 MHz clock\n");
+	} else {
+		/* Internal clock */
+		config |= MAX3107_CLKSRC_INTOSC_BIT;
+		config |= MAX3107_CLKSRC_PLL_BIT;
+		pr_info(PR_FMT "Using internal 3.7252 MHz clock\n");
+	}
 
 	/* Perform SPI transfer */
 	ret = max3107_out(max, config);
@@ -548,8 +571,7 @@ if (max->irq) {
 				IRQF_TRIGGER_FALLING, "max3107", max);
 	if (ret)
 		return ret;
-}
-else {
+} else {
 	/* if IRQ is disabled, start a read thread for input data */
 	max->read_thread =
 		kthread_run(max3107_read_thread, max, "max3107_read");
@@ -612,67 +634,109 @@ serial_m3107_set_termios(struct uart_port *port, struct ktermios *termios,
 	struct uart_max3107 *max =
 		container_of(port, struct uart_max3107, port);
 	unsigned char cval;
-	unsigned int baud /*, parity = 0*/;
+	unsigned int baud, parity = 0;
 	int clk_div = -1;
 	u16 config;
-	//u16 new_conf = max->cur_conf;
+	u16 new_conf = max->cur_conf;
 	u16 lcr_reg, mode1_reg, irqen_reg;
 	int loopback=0;
 
 	switch (termios->c_cflag & CSIZE) {
 	case CS7:
 		cval = UART_LCR_WLEN7;
-		//new_conf |= WC_7BIT_WORD;
+		new_conf |= WC_7BIT_WORD;
 		break;
 	default:
 	case CS8:
 		cval = UART_LCR_WLEN8;
-		//new_conf |= WC_8BIT_WORD;
+		new_conf |= WC_8BIT_WORD;
 		break;
 	}
 
-	baud = 115200; //uart_get_baud_rate(port, termios, old, 0, 230400);
-
-	/* first calc the div for 1.8MHZ clock case */
-	switch (baud) {
-	case 300:
-		//clk_div = WC_BAUD_DR384;
-		break;
-	case 600:
-		//clk_div = WC_BAUD_DR192;
-		break;
-	case 1200:
-		//clk_div = WC_BAUD_DR96;
-		break;
-	case 2400:
-		//clk_div = WC_BAUD_DR48;
-		break;
-	case 4800:
-		//clk_div = WC_BAUD_DR24;
-		break;
-	case 9600:
-		//clk_div = WC_BAUD_DR12;
-		break;
-	case 19200:
-		//clk_div = WC_BAUD_DR6;
-		break;
-	case 38400:
-		//clk_div = WC_BAUD_DR3;
-		break;
-	case 57600:
-		//clk_div = WC_BAUD_DR2;
-		break;
-	case 115200:
-		clk_div = MAX3107_CONSOLE_BRG13_IB115200;
-		break;
-	case 230400:
-		//if (max->clock & MAX3107_HIGH_CLK)
+	baud = uart_get_baud_rate(port, termios, old, 0, 230400);
+	
+	if (m3107_ext_clk(max)) {
+		switch (baud) {
+		case 300:
+			clk_div = MAX3107_EXT_B300;
 			break;
-	default:
-		/* pick the previous baud rate */
-		baud = max->baud;
-		//clk_div = max->cur_conf & WC_BAUD_DIV_MASK;
-		tty_termios_encode_baud_rate(termios, baud, baud);
+		case 600:
+			clk_div = MAX3107_EXT_B600;
+			break;
+		case 1200:
+			clk_div = MAX3107_EXT_B1200;
+			break;
+		case 2400:
+			clk_div = MAX3107_EXT_B2400;
+			break;
+		case 4800:
+			clk_div = MAX3107_EXT_B4800;
+			break;
+		case 9600:
+			clk_div = MAX3107_EXT_B9600;
+			break;
+		case 19200:
+			clk_div = MAX3107_EXT_B19200;
+			break;
+		case 38400:
+			clk_div = MAX3107_EXT_B38400;
+			break;
+		case 57600:
+			clk_div = MAX3107_EXT_B57600;
+			break;
+		case 115200:
+			clk_div = MAX3107_EXT_B115200;
+			break;
+		case 230400:
+			if (max->clock & MAX3107_HIGH_CLK)
+				break;
+		default:
+			/* pick the previous baud rate */
+			baud = max->baud;
+			clk_div = max->cur_conf & WC_BAUD_DIV_MASK;
+			tty_termios_encode_baud_rate(termios, baud, baud);
+		}
+	} else {
+		switch (baud) {
+		case 300:
+			clk_div = MAX3107_INT_B300;
+			break;
+		case 600:
+			clk_div = MAX3107_INT_B600;
+			break;
+		case 1200:
+			clk_div = MAX3107_INT_B1200;
+			break;
+		case 2400:
+			clk_div = MAX3107_INT_B2400;
+			break;
+		case 4800:
+			clk_div = MAX3107_INT_B4800;
+			break;
+		case 9600:
+			clk_div = MAX3107_INT_B9600;
+			break;
+		case 19200:
+			clk_div = MAX3107_INT_B19200;
+			break;
+		case 38400:
+			clk_div = MAX3107_INT_B38400;
+			break;
+		case 57600:
+			clk_div = MAX3107_INT_B57600;
+			break;
+		case 115200:
+			clk_div = MAX3107_INT_B115200;
+			break;
+		case 230400:
+			if (max->clock & MAX3107_HIGH_CLK)
+				break;
+		default:
+			/* pick the previous baud rate */
+			baud = max->baud;
+			clk_div = max->cur_conf & WC_BAUD_DIV_MASK;
+			tty_termios_encode_baud_rate(termios, baud, baud);
+		}
 	}
 
 	config = (MAX3107_WRITE_BIT | MAX3107_BRGDIVMSB_REG)
@@ -799,10 +863,9 @@ serial_m3107_set_termios(struct uart_port *port, struct ktermios *termios,
 	/* Perform SPI transfer */
 	max3107_out(max, config);
 
-//TODO:
-	/*if (max->clock & MAX3107_HIGH_CLK) {
+	if (max->clock & MAX3107_HIGH_CLK) {
 		clk_div += 1;
-		// high clk version max3107 doesn't support B300
+		/* high clk version max3107 doesn't support B300 */
 		if (baud == 300)
 			baud = 600;
 		if (baud == 230400)
@@ -833,10 +896,10 @@ serial_m3107_set_termios(struct uart_port *port, struct ktermios *termios,
 		//max3107_out(max, new_conf);
 		max->cur_conf = new_conf;
 		max->baud = baud;
-	}*/
+	}
 }
 
-/* don't handle hw handshaking */
+/* Don't handle hw handshaking */
 static unsigned int serial_m3107_get_mctrl(struct uart_port *port)
 {
 	return TIOCM_DSR | TIOCM_CAR | TIOCM_DSR;
@@ -882,7 +945,7 @@ struct uart_ops serial_m3107_ops = {
 static struct uart_driver serial_m3107_reg = {
 	.owner		= THIS_MODULE,
 	.driver_name	= "MAX3107 console",
-	.dev_name	= "ttyMAX",//"ttyS",
+	.dev_name	= "ttyMAX",
 	.major		= 204,
 	.minor		= 209,
 	.nr		= 1,
@@ -899,7 +962,15 @@ static int serial_m3107_resume(struct spi_device *spi)
 	return 0;
 }
 
-static int serial_m3107_probe(struct spi_device *spi)
+#ifdef CONFIG_MAX3107_DESIGNWARE
+static struct dw_spi_chip spi_uart = {
+	.poll_mode = 1,
+	.enable_dma = 0,
+	.type = SPI_FRF_SPI,
+};
+#endif
+
+static int __devinit serial_m3107_probe(struct spi_device *spi)
 {
 	struct uart_max3107 *max;
 	int ret;
@@ -912,9 +983,12 @@ static int serial_m3107_probe(struct spi_device *spi)
 	/* set spi info */
 	spi->mode = SPI_MODE_0;
 	spi->bits_per_word = 16;
+#ifdef CONFIG_MAX3107_DESIGNWARE
+	spi->controller_data = &spi_uart;
+#endif
 	spi_setup(spi);
 
-	max->clock = 1;
+	max->clock = MAX3107_HIGH_CLK;
 	max->port.type = PORT_PXA;	/* Need apply for a max3107 type */
 	max->port.fifosize = 128;		/* 128 word buffer */
 	max->port.ops = &serial_m3107_ops;
@@ -965,14 +1039,13 @@ err_get_page:
 	return ret;
 }
 
-static int max3107con_remove(struct spi_device *dev)
+static int __devexit serial_max3107_remove(struct spi_device *dev)
 {
-	struct uart_max3107 *max = pmax;
+	struct uart_max3107 *max = spi_get_drvdata(dev);
 
-	if (!pmax)
+	if (!max)
 		return 0;
 
-	pmax = NULL;
 	uart_remove_one_port(&serial_m3107_reg, &max->port);
 
 	free_page((unsigned long)max->con_xmit.buf);
@@ -991,12 +1064,12 @@ static struct spi_driver uart_max3107_driver = {
 			.owner	= THIS_MODULE,
 	},
 	.probe		= serial_m3107_probe,
-	.remove		= __devexit_p(max3107con_remove),
+	.remove		= __devexit_p(serial_max3107_remove),
 	.suspend	= serial_m3107_suspend,
 	.resume		= serial_m3107_resume,
 };
 
-int __init serial_m3107_init(void)
+static int __init serial_m3107_init(void)
 {
 	int ret = 0;
 
@@ -1011,7 +1084,7 @@ int __init serial_m3107_init(void)
 	return ret;
 }
 
-void __exit serial_m3107_exit(void)
+static void __exit serial_m3107_exit(void)
 {
 	spi_unregister_driver(&uart_max3107_driver);
 	uart_unregister_driver(&serial_m3107_reg);
@@ -1021,4 +1094,4 @@ module_init(serial_m3107_init);
 module_exit(serial_m3107_exit);
 
 MODULE_ALIAS("max3107-uart");
-MODULE_AUTHOR("Wouter Baks <wouter.baks@xxxxx.com>");
+MODULE_AUTHOR("Feng Tang <feng.tang@xxxxxxxxx>");
